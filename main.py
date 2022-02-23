@@ -8,7 +8,7 @@ import mido
 import pygame
 from pygame.locals import *
 
-from transform import get_matrices, apply
+from transform import get_matrix, apply
 
 pygame.init()
 
@@ -40,77 +40,13 @@ def draw_box(box, index):
     pygame.draw.line(screen, (128, 128, 128), box[2], box[3], 5)
 
 
-# def box_to_transformation(box):
-#     """
-#     Given a box (quadrilateral) in global coordinates, return a transformation
-#     matrix that maps vectors in the global basis to vectors in the box basis.
-#     """
-
-#     # Based on work by
-#     # https://math.stackexchange.com/questions/296794/finding-the-transform-matrix-from-4-projected-points-with-javascript/339033#339033
-
-#     # Convert box coordinates to homogeneous coordinates as numpy arrays
-#     homo_box = [np.transpose(np.array([[p[0], p[1], 1]])) for p in box]
-
-#     # Concate three of the box points as column vectors into a matrix
-#     three_points = np.concatenate(homo_box[:3], axis=1)
-#     fourth_point = homo_box[3]
-
-#     # Solve (three_points) * (coefficients) = (fourth_point)
-#     coefficients = np.matmul(np.linalg.inv(three_points), fourth_point)
-
-#     # Scale the each column matrix of three points by the computed coefficients
-#     scale = np.array(
-#         [
-#             [coefficients[0][0], 0, 0],
-#             [0, coefficients[1][0], 0],
-#             [0, 0, coefficients[2][0]],
-#         ]
-#     )
-
-#     scaled = np.matmul(three_points, scale)
-
-#     return scaled
-
-
-# def point_within_box(point, box):
-#     # Convert the point to homogeneous coordinates
-#     homo_source_point = np.array([[point[0], point[1], 1]])
-#     homo_source_vector = np.transpose(homo_source_point)
-
-#     # Matrix which maps a vector to the global basis
-#     # map_to_global_basis = box_to_transformation(
-#     #     [(0, 0), (width, 0), (0, height), (width, height)]
-#     # )
-#     # Matrix which maps a vector to the basis of the provided box
-#     map_to_box_basis = box_to_transformation(box)
-
-#     # Combined matrix to map a vector in the global basis to the box basis
-#     # transform_global_to_box = np.matmul(
-#     #     map_to_box_basis, np.linalg.inv(map_to_global_basis)
-#     # )
-#     transform_global_to_box = map_to_box_basis
-
-#     # Normalize the transformation matrix
-#     transform_global_to_box /= transform_global_to_box[2][2]
-
-#     # Use the matrix to transform the point to the box basis
-#     homo_dest_vector = np.matmul(transform_global_to_box, homo_source_vector)
-#     homo_dest_point = np.transpose(homo_dest_vector)[0]
-
-#     # Convert back to Cartesian
-#     return (
-#         homo_dest_point[0] / homo_dest_point[2],
-#         homo_dest_point[1] / homo_dest_point[2],
-#     )
-
 matrices = [None, None]
 
 
 def calculate_matrices():
     if all(bounding_boxes):
-        matrices[0] = get_matrices(bounding_boxes[:4])[0]
-        matrices[1] = get_matrices(bounding_boxes[4:])[0]
+        matrices[0] = get_matrix(bounding_boxes[:4])
+        matrices[1] = get_matrix(bounding_boxes[4:])
     else:
         matrices[0] = None
         matrices[1] = None
