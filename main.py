@@ -14,7 +14,7 @@ pygame.init()
 
 font = pygame.font.SysFont("Comic Sans MS", 18)
 
-fps = 5  # 60
+fps = 60
 fpsClock = pygame.time.Clock()
 
 width, height = 640, 480

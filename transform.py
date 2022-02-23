@@ -24,7 +24,7 @@ def map_basis_to_points(points):
     # Convert points (as a list of tuples)
     # to homogenous coordinates
     # (as a list of numpy arrays representing column vectors)
-    homo_points = [np.array([[point[0], point[1], 1]]) for point in points]
+    homo_points = [np.array([[point[0]], [point[1]], [1]]) for point in points]
 
     # Concatenate three homogenous coordinate column vectors into matrix
     three_points = np.concatenate(homo_points[:3], axis=1)
