@@ -28,6 +28,8 @@ atexit.register(port.close)
 
 modes = ["note", "cc"]
 
+zoom = 200.0
+
 
 def draw_box(box, index):
     pygame.draw.line(
@@ -87,6 +89,12 @@ while True:
             elif event.key == ord("m"):
                 modes[1] = "cc" if modes[1] == "note" else "note"
 
+            elif event.key == ord("z"):
+                zoom *= 1.25
+
+            elif event.key == ord("x"):
+                zoom //= 1.25
+
     # Update.
 
     # placeholder: use mouse position instead of lidar
@@ -99,6 +107,12 @@ while True:
         print(mousePos, pointWithinFirst, pointWithinSecond)
 
     # Draw.
+
+    # Draw ring at 1m
+    pygame.draw.circle(screen, (255, 128, 0), (width // 2, height // 2), zoom, 2)
+
+    # Draw ring at 0.5m
+    pygame.draw.circle(screen, (128, 0, 255), (width // 2, height // 2), zoom / 2, 2)
 
     # Draw window information
     text = font.render(
