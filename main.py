@@ -44,13 +44,18 @@ def draw_box(box, index):
 
 matrices = [None, None]
 
+current_notes = [None, None]
+current_cc = 0
+
 
 def calculate_matrices():
-    if all(bounding_boxes):
+    if all(bounding_boxes[:4]):
         matrices[0] = get_matrix(bounding_boxes[:4])
-        matrices[1] = get_matrix(bounding_boxes[4:])
     else:
         matrices[0] = None
+    if all(bounding_boxes[4:]):
+        matrices[1] = get_matrix(bounding_boxes[4:])
+    else:
         matrices[1] = None
 
 
@@ -100,11 +105,41 @@ while True:
     # placeholder: use mouse position instead of lidar
     mousePos = pygame.mouse.get_pos()
 
-    if all(bounding_boxes):
+    new_notes = current_notes[:]
+    new_cc = current_cc
+
+    if all(bounding_boxes[:4]):
         pointWithinFirst = apply(mousePos, matrices[0])
+
+        if all(0 <= coord <= 1 for coord in pointWithinFirst):
+            if modes[0] == "note":
+                new_notes[0] = int(60 + pointWithinFirst[0] * 24)
+            else:
+                new_notes[0] = None
+
+            if modes[0] == "cc":
+                new_cc = int(pointWithinFirst[0] * 127)
+        else:
+            new_notes[0] = None
+    else:
+        new_notes[0] = None
+
+    for i, note in enumerate(new_notes):
+        if note != current_notes[i]:
+            if current_notes[i] is not None:
+                port.send(mido.Message("note_off", note=current_notes[i]))
+            if note is not None:
+                port.send(mido.Message("note_on", note=note))
+            current_notes[i] = note
+
+    if new_cc != current_cc:
+        port.send(mido.Message("control_change", control=16, value=new_cc))
+        current_cc = new_cc
+
+    if all(bounding_boxes[4:]):
         pointWithinSecond = apply(mousePos, matrices[1])
 
-        print(mousePos, pointWithinFirst, pointWithinSecond)
+        # print(mousePos, pointWithinFirst, pointWithinSecond)
 
     # Draw.
 
