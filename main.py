@@ -1,7 +1,11 @@
 import sys
 import atexit
+import threading
 
 import mido
+import rplidar
+
+import numpy as np
 
 import pygame
 from pygame.locals import *
@@ -24,6 +28,18 @@ bounding_boxes = [None, None, None, None, None, None, None, None]
 
 port = mido.open_output("BMC LIDAR", virtual=True)
 atexit.register(port.close)
+
+lidar = rplidar.RPLidar("/dev/tty.usbserial-0001")
+lidar.start_motor()
+
+
+def close_lidar():
+    lidar.stop()
+    lidar.stop_motor()
+    lidar.disconnect()
+
+
+atexit.register(close_lidar)
 
 axes = [
     Axis(port, 0, 16, "note"),
@@ -58,6 +74,18 @@ def calculate_matrices():
         matrices[1] = get_matrix(bounding_boxes[4:])
     else:
         matrices[1] = None
+
+
+measurements = [0] * 360
+
+
+def measure():
+    for scan in lidar.iter_scans():
+        for quality, angle, distance in scan:
+            measurements[int(angle)] = distance
+
+
+threading.Thread(target=measure, daemon=True, name="LIDAR Comms").start()
 
 
 # Game loop.
@@ -134,6 +162,22 @@ while True:
 
     # Draw.
 
+    # Draw point cloud
+
+    # zoom is for 1m, measurements are in mm
+    scale_factor = zoom / 1000
+
+    for i, dist in enumerate(measurements):
+        pygame.draw.circle(
+            screen,
+            (0, 255, 0),
+            (
+                int(dist * scale_factor * np.cos(i * np.pi / 180) + width / 2),
+                int(dist * scale_factor * np.sin(i * np.pi / 180) + height / 2),
+            ),
+            1,
+        )
+
     # Draw ring at 1m
     pygame.draw.circle(screen, (255, 128, 0), (width // 2, height // 2), zoom, 2)
 
@@ -159,9 +203,6 @@ while True:
 
     # Draw center of window
     pygame.draw.circle(screen, (255, 255, 255), (width // 2, height // 2), 5)
-
-    # Draw point cloud
-    # TODO
 
     # draw bounding box points
     for i, point in enumerate(bounding_boxes):
