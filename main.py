@@ -136,52 +136,51 @@ while True:
 
     # Update.
 
-    # placeholder: use mouse position instead of lidar
-    mousePos = pygame.mouse.get_pos()
+    scale_factor = zoom / 1000
 
-    if all(bounding_boxes[:4]):
-        pointWithinFirst = apply(mousePos, matrices[0])
+    point_cloud = [
+        (
+            int(dist * scale_factor * np.cos(angle * np.pi / 180) + width / 2),
+            int(dist * scale_factor * np.sin(angle * np.pi / 180) + height / 2),
+        )
+        for (angle, dist) in measurements
+    ]
 
-        if all(0 <= coord <= 1 for coord in pointWithinFirst):
-            axes[0].handle_input(pointWithinFirst[0])
-            axes[1].handle_input(pointWithinFirst[1])
-        else:
-            axes[0].handle_input()
-            axes[1].handle_input()
-    else:
-        axes[0].handle_input()
-        axes[1].handle_input()
+    box_points = [[] for _ in matrices]
 
-    if all(bounding_boxes[4:]):
-        pointWithinSecond = apply(mousePos, matrices[1])
+    for point in point_cloud:
+        for i, matrix in enumerate(matrices):
+            if matrix is None:
+                break
 
-        if all(0 <= coord <= 1 for coord in pointWithinSecond):
-            axes[2].handle_input(pointWithinSecond[0])
-            axes[3].handle_input(pointWithinSecond[1])
-        else:
-            axes[2].handle_input()
-            axes[3].handle_input()
-    else:
-        axes[2].handle_input()
-        axes[3].handle_input()
+            point_in_matrix = apply(point, matrix)
+
+            if all(0 <= coord <= 1 for coord in point_in_matrix):
+                box_points[i].append(point_in_matrix)
+                break
+
+    average_points = [None, None]
+
+    for i, points in enumerate(box_points):
+        if points:
+            average_points[i] = (
+                sum(point[0] for point in points) / len(points),
+                sum(point[1] for point in points) / len(points),
+            )
+
+    axes[0].handle_input(average_points[0][0] if average_points[0] else None)
+    axes[1].handle_input(average_points[0][1] if average_points[0] else None)
+    axes[2].handle_input(average_points[1][0] if average_points[1] else None)
+    axes[3].handle_input(average_points[1][1] if average_points[1] else None)
 
     # Draw.
 
     # Draw point cloud
 
     # zoom is for 1m, measurements are in mm
-    scale_factor = zoom / 1000
 
-    for angle, dist in measurements.copy():
-        pygame.draw.circle(
-            screen,
-            (0, 255, 0),
-            (
-                int(dist * scale_factor * np.cos(angle * np.pi / 180) + width / 2),
-                int(dist * scale_factor * np.sin(angle * np.pi / 180) + height / 2),
-            ),
-            1,
-        )
+    for point in point_cloud:
+        pygame.draw.circle(screen, (0, 255, 0), point, 1)
 
     # Draw ring at 1m
     pygame.draw.circle(screen, (255, 128, 0), (width // 2, height // 2), zoom, 2)

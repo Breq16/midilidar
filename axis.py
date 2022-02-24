@@ -33,6 +33,8 @@ class Axis:
 
     def update(self, note, value):
         if note != self.current_note:
+            print(f"{self} -> {note}")
+
             if self.current_note:
                 self.port.send(
                     mido.Message(
