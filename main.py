@@ -77,31 +77,14 @@ def calculate_matrices():
         matrices[1] = None
 
 
-measurements = collections.deque(maxlen=1000)
+measurements = []
 
 
 def measure():
-    rotations = 0
-    need_incr = False
+    global measurements
 
-    prev_angle = 0
-
-    for new_scan, quality, angle, distance in lidar.iter_measures():
-        if angle < 10 and need_incr:
-            rotations += 1
-            need_incr = False
-
-        if 190 > angle > 180 and not need_incr:
-            need_incr = True
-
-        if 360 * rotations + angle - prev_angle > 10:
-            print("Angle jump:", 360 * rotations + angle - prev_angle, angle, new_scan)
-        prev_angle = angle + 360 * rotations
-
-        measurements.append((360 * rotations + angle, distance))
-
-        while measurements[0][0] < measurements[-1][0] - 360:
-            measurements.popleft()
+    for scan in lidar.iter_scans(min_len=50):
+        measurements = [(angle, distance) for quality, angle, distance in scan]
 
 
 threading.Thread(target=measure, daemon=True, name="LIDAR Comms").start()
