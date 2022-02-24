@@ -1,6 +1,7 @@
 import sys
 import atexit
 import threading
+import collections
 
 import mido
 import rplidar
@@ -76,13 +77,25 @@ def calculate_matrices():
         matrices[1] = None
 
 
-measurements = [0] * 360
+measurements = collections.deque(maxlen=1000)
 
 
 def measure():
-    for scan in lidar.iter_scans():
-        for quality, angle, distance in scan:
-            measurements[int(angle)] = distance
+    rotations = 0
+    need_incr = False
+
+    for new_scan, quality, angle, distance in lidar.iter_measures():
+        if angle < 180 and need_incr:
+            rotations += 1
+            need_incr = False
+
+        if angle > 180 and not need_incr:
+            need_incr = True
+
+        measurements.append((360 * rotations + angle, distance))
+
+        while measurements[0][0] < measurements[-1][0] - 360:
+            measurements.popleft()
 
 
 threading.Thread(target=measure, daemon=True, name="LIDAR Comms").start()
@@ -97,6 +110,9 @@ while True:
             pygame.quit()
             sys.exit()
         elif event.type == MOUSEBUTTONDOWN:
+            if event.button != 1:
+                continue
+
             try:
                 first_empty = bounding_boxes.index(None)
             except ValueError:
@@ -167,13 +183,13 @@ while True:
     # zoom is for 1m, measurements are in mm
     scale_factor = zoom / 1000
 
-    for i, dist in enumerate(measurements):
+    for angle, dist in measurements.copy():
         pygame.draw.circle(
             screen,
             (0, 255, 0),
             (
-                int(dist * scale_factor * np.cos(i * np.pi / 180) + width / 2),
-                int(dist * scale_factor * np.sin(i * np.pi / 180) + height / 2),
+                int(dist * scale_factor * np.cos(angle * np.pi / 180) + width / 2),
+                int(dist * scale_factor * np.sin(angle * np.pi / 180) + height / 2),
             ),
             1,
         )
