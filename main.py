@@ -1,14 +1,13 @@
 import sys
 import atexit
 
-import numpy as np
-
 import mido
 
 import pygame
 from pygame.locals import *
 
 from transform import get_matrix, apply
+from axis import Axis
 
 pygame.init()
 
@@ -26,7 +25,12 @@ bounding_boxes = [None, None, None, None, None, None, None, None]
 port = mido.open_output("BMC LIDAR", virtual=True)
 atexit.register(port.close)
 
-modes = ["note", "cc"]
+axes = [
+    Axis(port, 0, 16, "note"),
+    Axis(port, 1, 17, "cc"),
+    Axis(port, 2, 18, "cc"),
+    Axis(port, 3, 19, "cc"),
+]
 
 zoom = 200.0
 
@@ -43,9 +47,6 @@ def draw_box(box, index):
 
 
 matrices = [None, None]
-
-current_notes = [None, None]
-current_cc = 0
 
 
 def calculate_matrices():
@@ -89,10 +90,10 @@ while True:
                 calculate_matrices()
 
             elif event.key == ord("n"):
-                modes[0] = "cc" if modes[0] == "note" else "note"
+                axes[0].toggle_mode()
 
             elif event.key == ord("m"):
-                modes[1] = "cc" if modes[1] == "note" else "note"
+                axes[2].toggle_mode()
 
             elif event.key == ord("z"):
                 zoom *= 1.25
@@ -105,41 +106,31 @@ while True:
     # placeholder: use mouse position instead of lidar
     mousePos = pygame.mouse.get_pos()
 
-    new_notes = current_notes[:]
-    new_cc = current_cc
-
     if all(bounding_boxes[:4]):
         pointWithinFirst = apply(mousePos, matrices[0])
 
         if all(0 <= coord <= 1 for coord in pointWithinFirst):
-            if modes[0] == "note":
-                new_notes[0] = int(60 + pointWithinFirst[0] * 24)
-            else:
-                new_notes[0] = None
-
-            if modes[0] == "cc":
-                new_cc = int(pointWithinFirst[0] * 127)
+            axes[0].handle_input(pointWithinFirst[0])
+            axes[1].handle_input(pointWithinFirst[1])
         else:
-            new_notes[0] = None
+            axes[0].handle_input()
+            axes[1].handle_input()
     else:
-        new_notes[0] = None
-
-    for i, note in enumerate(new_notes):
-        if note != current_notes[i]:
-            if current_notes[i] is not None:
-                port.send(mido.Message("note_off", note=current_notes[i]))
-            if note is not None:
-                port.send(mido.Message("note_on", note=note))
-            current_notes[i] = note
-
-    if new_cc != current_cc:
-        port.send(mido.Message("control_change", control=16, value=new_cc))
-        current_cc = new_cc
+        axes[0].handle_input()
+        axes[1].handle_input()
 
     if all(bounding_boxes[4:]):
         pointWithinSecond = apply(mousePos, matrices[1])
 
-        # print(mousePos, pointWithinFirst, pointWithinSecond)
+        if all(0 <= coord <= 1 for coord in pointWithinSecond):
+            axes[2].handle_input(pointWithinSecond[0])
+            axes[3].handle_input(pointWithinSecond[1])
+        else:
+            axes[2].handle_input()
+            axes[3].handle_input()
+    else:
+        axes[2].handle_input()
+        axes[3].handle_input()
 
     # Draw.
 
@@ -159,27 +150,12 @@ while True:
 
     # Draw channel information
 
+    colors = [(255, 0, 0), (0, 255, 0), (255, 255, 0), (0, 255, 255)]
+
     # Axis 0
-    if modes[0] == "note":
-        text = font.render("Note", False, (255, 0, 0))
-    else:
-        text = font.render("CC 16", False, (255, 0, 0))
-    screen.blit(text, (10, 30))
-
-    # Axis 1
-    text = font.render("CC 17", False, (0, 255, 0))
-    screen.blit(text, (10, 50))
-
-    # Axis 2
-    if modes[1] == "note":
-        text = font.render("Note", False, (255, 255, 0))
-    else:
-        text = font.render("CC 18", False, (255, 255, 0))
-    screen.blit(text, (10, 70))
-
-    # Axis 3
-    text = font.render("CC 19", False, (0, 255, 255))
-    screen.blit(text, (10, 90))
+    for i, axis in enumerate(axes):
+        text = font.render(str(axis), False, colors[i])
+        screen.blit(text, (10, 30 + i * 20))
 
     # Draw center of window
     pygame.draw.circle(screen, (255, 255, 255), (width // 2, height // 2), 5)
