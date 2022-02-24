@@ -84,13 +84,19 @@ def measure():
     rotations = 0
     need_incr = False
 
+    prev_angle = 0
+
     for new_scan, quality, angle, distance in lidar.iter_measures():
-        if angle < 180 and need_incr:
+        if angle < 10 and need_incr:
             rotations += 1
             need_incr = False
 
-        if angle > 180 and not need_incr:
+        if 190 > angle > 180 and not need_incr:
             need_incr = True
+
+        if 360 * rotations + angle - prev_angle > 10:
+            print("Angle jump:", 360 * rotations + angle - prev_angle, angle, new_scan)
+        prev_angle = angle + 360 * rotations
 
         measurements.append((360 * rotations + angle, distance))
 
