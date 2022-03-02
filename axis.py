@@ -12,8 +12,10 @@ class Axis:
         # Note Mode
         self.channel = channel
         self.current_note = None
+        self.current_bend = 0
         self.min_note = 60
-        self.range = 24
+        self.range = 12
+        self.continuous = True
 
         # CC Mode
         self.control = control
@@ -22,16 +24,21 @@ class Axis:
     def handle_input(self, position=None):
         note = None
         value = None
+        bend = 0
 
         if position:
             if self.mode == "note":
-                note = self.min_note + int(position * self.range)
+                note = self.min_note + int(round(position * self.range))
+                if self.continuous:
+                    bend = (position * self.range) % 1
+                    if bend > 0.5:
+                        bend -= 1
             if self.mode == "cc":
                 value = int(position * 127)
 
-        self.update(note, value)
+        self.update(note, value, bend)
 
-    def update(self, note, value):
+    def update(self, note, value, bend):
         if note != self.current_note:
             print(f"{self} -> {note}")
 
@@ -62,11 +69,22 @@ class Axis:
                     )
                 )
 
+        if bend != self.current_bend:
+            self.current_bend = bend
+
+            self.port.send(
+                mido.Message(
+                    "pitchwheel",
+                    pitch=int(self.current_bend * 4096),
+                    channel=self.channel,
+                )
+            )
+
     def toggle_mode(self):
         self.mode = "cc" if self.mode == "note" else "note"
 
     def __str__(self):
         if self.mode == "note":
-            return f"Note Ch{self.channel} N{self.current_note}"
+            return f"Note Ch{self.channel} N{self.current_note} B{round(self.current_bend, 2)}"
         else:
             return f"CC C{self.control} V{self.current_value}"

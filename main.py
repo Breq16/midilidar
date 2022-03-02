@@ -1,7 +1,6 @@
 import sys
 import atexit
 import threading
-import collections
 
 import mido
 import rplidar
