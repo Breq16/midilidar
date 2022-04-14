@@ -26,32 +26,53 @@ class Axis:
         self.continuous = tk.BooleanVar(self.root, True)
 
         # CC Mode
-        self.control = control
+        self.control = tk.IntVar(self.root, control)
         self.current_value = None
 
         # Processing
         self.glide = tk.IntVar(self.root, False)
         self.invert = tk.BooleanVar(self.root, False)
 
+        # Misc
+        self.enabled = False
+
+        # Readouts
+        self.input = tk.StringVar(self.root, "")
+        self.output = tk.StringVar(self.root, "")
+
+    @property
+    def range(self):
+        return self.max_note.get() - self.min_note.get()
+
     def handle_input(self, position=None):
         note = None
         value = None
         bend = 0
 
-        if position is not None:
+        self.input.set(f"{position:.2f}" if position is not None else "None")
+        output_set = False
+
+        if self.enabled and position is not None:
             if self.invert.get():
                 position = 1 - position
 
             if self.mode.get() == "note":
-                note = self.min_note.get() + int(
-                    round(position * (self.max_note.get() - self.min_note.get()))
-                )
+                note = self.min_note.get() + int(round(position * self.range))
                 if self.continuous.get():
                     bend = (position * self.range) % 1
                     if bend > 0.5:
                         bend -= 1
+
+                self.output.set(f"Note {note} {bend:+.2f}")
+                output_set = True
+
             if self.mode.get() == "cc":
                 value = int(position * 127)
+                self.output.set(f"CC {self.control.get()}, value {value}")
+                output_set = True
+
+        if not output_set:
+            self.output.set("No Output")
 
         self.update(note, value, bend)
 
@@ -82,7 +103,7 @@ class Axis:
                 self.port.send(
                     mido.Message(
                         "control_change",
-                        control=self.control,
+                        control=self.control.get(),
                         value=self.current_value,
                         channel=self.channel.get() - 1,
                     )
@@ -98,12 +119,6 @@ class Axis:
                     channel=self.channel.get() - 1,
                 )
             )
-
-    def __str__(self):
-        if self.mode.get() == "note":
-            return f"Note Ch{self.channel.get()} N{self.current_note} B{round(self.current_bend, 2)}"
-        else:
-            return f"CC C{self.control} V{self.current_value}"
 
     def get_frame(self):
         frame = tk.Frame(self.root)
@@ -142,7 +157,35 @@ class Axis:
         tk.Label(glideFrame, text="ms").pack(side=tk.LEFT)
         glideFrame.grid(row=4, column=0)
 
+        controlFrame = tk.Frame(frame)
+        tk.Label(controlFrame, text="Control").pack(side=tk.LEFT)
+        tk.Entry(controlFrame, textvariable=self.control, width=2).pack(side=tk.LEFT)
+        controlFrame.grid(row=4, column=1)
+
+        self.enable_button = tk.Button(
+            frame, text="Enable", command=self.toggle_enabled
+        )
+        self.enable_button.grid(row=5, column=0, columnspan=2)
+
+        readoutFrame = tk.Frame(frame)
+        tk.Label(readoutFrame, textvariable=self.input).grid(
+            row=0, column=0, sticky=tk.E
+        )
+        tk.Label(readoutFrame, text="➔").grid(row=0, column=1, sticky=tk.E + tk.W)
+        tk.Label(readoutFrame, textvariable=self.output).grid(
+            row=0, column=2, sticky=tk.W
+        )
+        readoutFrame.grid_columnconfigure(0, weight=1, uniform="readout")
+        readoutFrame.grid_columnconfigure(2, weight=2, uniform="readout")
+
+        readoutFrame.grid(row=6, column=0, columnspan=2)
+
         return frame
+
+    def toggle_enabled(self):
+        self.enabled = not self.enabled
+
+        self.enable_button.configure(text="Disable" if self.enabled else "Enable")
 
 
 COLORS = ["#ff6666", "#00ff00", "#ffff00", "#00ffff"]
@@ -172,10 +215,11 @@ def main(queue):
         frame.pack(side=tk.TOP, pady=(0, 10))
 
     def update():
-        data = queue.get()
+        while True:
+            data = queue.get()
 
-        for i, val in enumerate(data):
-            axes[i].handle_input(val)
+            for i, val in enumerate(data):
+                axes[i].handle_input(val)
 
     threading.Thread(target=update).start()
 
